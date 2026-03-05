@@ -1,84 +1,167 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-
-    <title>PunchXR</title>
-
+    <title>PunchXR Hybrid Game</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.1/dist/aframe-physics-system.min.js"></script>
 
-    <script src="js/game-manager.js"></script>
-    <script src="js/target-spawner.js"></script>
-    <script src="js/punch-detection.js"></script>
+    <script>
+        // 1. GAME MANAGER: Handles score, timer, and state
+        AFRAME.registerComponent('game-manager', {
+            schema: { duration: { default: 30 } },
+            init: function() {
+                this.score = 0;
+                this.timeLeft = this.data.duration;
+                this.scoreText = document.querySelector('#scoreText');
+                this.timerText = document.querySelector('#timerText');
+                this.isPlaying = true;
 
+                // Start Countdown
+                this.timerInterval = setInterval(() => {
+                    if (!this.isPlaying) return;
+                    this.timeLeft--;
+                    this.timerText.setAttribute('value', 'Time: ' + this.timeLeft);
+                    
+                    if (this.timeLeft <= 0) {
+                        this.isPlaying = false;
+                        this.timerText.setAttribute('value', 'Game Over!');
+                        this.timerText.setAttribute('color', 'red');
+                        clearInterval(this.timerInterval);
+                    }
+                }, 1000);
+            },
+            addScore: function() {
+                if (!this.isPlaying) return;
+                this.score += 10;
+                this.scoreText.setAttribute('value', 'Score: ' + this.score);
+            }
+        });
+
+        // 2. TARGET SPAWNER: Randomly generates targets
+        AFRAME.registerComponent('target-spawner', {
+            init: function() {
+                this.spawnTimer = 0;
+            },
+            tick: function(time, timeDelta) {
+                let gameManager = this.el.sceneEl.components['game-manager'];
+                if (!gameManager || !gameManager.isPlaying) return;
+
+                this.spawnTimer += timeDelta;
+                // Spawn a new target every 1.2 seconds
+                if (this.spawnTimer > 1200) { 
+                    this.spawnTimer = 0;
+                    this.spawnTarget();
+                }
+            },
+            spawnTarget: function() {
+                let el = document.createElement('a-sphere');
+                
+                // Random position in front of the player
+                let x = (Math.random() - 0.5) * 4;
+                let y = 1 + Math.random() * 1.5;
+                let z = -2 - Math.random() * 2; // Spawn further back
+
+                el.setAttribute('position', {x: x, y: y, z: z});
+                el.setAttribute('radius', '0.2');
+                el.setAttribute('color', '#FFD700'); // Gold targets
+                el.setAttribute('class', 'target'); // Needed for raycaster interaction
+                el.setAttribute('hit-handler', ''); // Attach hit logic
+
+                // Animate floating towards the player
+                el.setAttribute('animation', `property: position; to: ${x} ${y} ${z + 3}; dur: 4000; easing: linear`);
+
+                this.el.appendChild(el);
+
+                // Cleanup target if player misses it
+                setTimeout(() => {
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                }, 4000);
+            }
+        });
+
+        // 3. HIT HANDLER: Detects Clicks, VR Lasers, and Physical Punches
+        AFRAME.registerComponent('hit-handler', {
+            init: function() {
+                this.hit = false;
+                this.leftHand = document.querySelector('#leftHand');
+                this.rightHand = document.querySelector('#rightHand');
+
+                // Performance optimization: Pre-allocate vectors
+                this.targetPos = new THREE.Vector3();
+                this.leftPos = new THREE.Vector3();
+                this.rightPos = new THREE.Vector3();
+
+                // Detect Mouse Click OR VR Controller Trigger (Raycaster intersection)
+                this.el.addEventListener('click', () => {
+                    this.registerHit();
+                });
+            },
+            tick: function() {
+                if (this.hit) return;
+
+                // Detect Physical Punch (Distance checking)
+                this.el.object3D.getWorldPosition(this.targetPos);
+
+                if (this.leftHand && this.leftHand.object3D) {
+                    this.leftHand.object3D.getWorldPosition(this.leftPos);
+                    // If distance is less than sum of radii (0.2 target + 0.1 glove)
+                    if (this.leftPos.distanceTo(this.targetPos) < 0.3) {
+                        this.registerHit();
+                        return;
+                    }
+                }
+
+                if (this.rightHand && this.rightHand.object3D) {
+                    this.rightHand.object3D.getWorldPosition(this.rightPos);
+                    if (this.rightPos.distanceTo(this.targetPos) < 0.3) {
+                        this.registerHit();
+                        return;
+                    }
+                }
+            },
+            registerHit: function() {
+                if (this.hit) return;
+                this.hit = true;
+
+                // Add score
+                let gameManager = this.el.sceneEl.components['game-manager'];
+                if (gameManager) gameManager.addScore();
+
+                // Shrink animation for visual feedback, then delete
+                this.el.setAttribute('animation__hit', 'property: scale; to: 0 0 0; dur: 150');
+                setTimeout(() => {
+                    if (this.el.parentNode) {
+                        this.el.parentNode.removeChild(this.el);
+                    }
+                }, 150);
+            }
+        });
+    </script>
 </head>
 
 <body>
-
-    <a-scene physics="gravity: -9.8" renderer="colorManagementEnabled: true">
-
-        <!-- ENVIRONMENT -->
-
+    <a-scene game-manager cursor="rayOrigin: mouse" raycaster="objects: .target">
+        
         <a-sky color="#111"></a-sky>
+        <a-plane rotation="-90 0 0" width="30" height="30" color="#222"></a-plane>
 
-        <a-plane rotation="-90 0 0" width="30" height="30" color="#222" static-body>
-        </a-plane>
-
-
-        <!-- SCORE UI -->
-
-        <a-text id="scoreText" value="Score: 0" position="0 2 -1" align="center" color="white" width="4">
-        </a-text>
-
-
-        <!-- TIMER UI -->
-
-        <a-text id="timerText" value="Time: 30" position="0 1.7 -1" align="center" color="white" width="4">
-        </a-text>
-
-
-        <!-- INSTRUCTIONS UI -->
-
-        <a-text id="instructionsText" value="Desktop: Click mouse | VR: Use controller trigger/grip" position="0 1.4 -1" align="center" color="#888" width="6" scale="0.8 0.8 0.8">
-        </a-text>
-
-
-        <!-- PLAYER -->
-
-        <a-entity id="rig" position="0 1.6 0">
-
-            <!-- CAMERA -->
-            <a-camera id="camera" look-controls></a-camera>
-
-            <!-- LEFT HAND -->
-
-            <a-entity id="leftHand" hand-controls="hand: left">
-
-                <a-sphere radius="0.08" color="red" class="puncher" punch-detection="hand: left" position="0 0 0" scale="1 1 1">
-                </a-sphere>
-
-            </a-entity>
-
-
-            <!-- RIGHT HAND -->
-
-            <a-entity id="rightHand" hand-controls="hand: right">
-
-                <a-sphere radius="0.08" color="blue" class="puncher" punch-detection="hand: right" position="0 0 0" scale="1 1 1">
-                </a-sphere>
-
-            </a-entity>
-
-        </a-entity>
-
-
-        <!-- TARGET SPAWNER -->
+        <a-text id="scoreText" value="Score: 0" position="0 2.5 -2" align="center" color="white" width="6"></a-text>
+        <a-text id="timerText" value="Time: 30" position="0 2.2 -2" align="center" color="white" width="6"></a-text>
+        <a-text value="Desktop: Click targets | VR: Trigger ray OR physically punch" position="0 1.9 -2" align="center" color="#888" width="5"></a-text>
 
         <a-entity target-spawner></a-entity>
 
+        <a-entity id="rig" position="0 0 0">
+            <a-camera id="camera" position="0 1.6 0"></a-camera>
+
+            <a-entity id="leftHand" laser-controls="hand: left" raycaster="objects: .target; showLine: true">
+                <a-sphere radius="0.1" color="red" position="0 0 0" material="opacity: 0.8; transparent: true"></a-sphere>
+            </a-entity>
+
+            <a-entity id="rightHand" laser-controls="hand: right" raycaster="objects: .target; showLine: true">
+                <a-sphere radius="0.1" color="blue" position="0 0 0" material="opacity: 0.8; transparent: true"></a-sphere>
+            </a-entity>
+        </a-entity>
+
     </a-scene>
-
 </body>
-
 </html>
