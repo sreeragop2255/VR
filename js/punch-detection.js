@@ -12,23 +12,47 @@ AFRAME.registerComponent('punch-detection', {
         this.punchVelocity = new THREE.Vector3()
         this.scene = this.el.sceneEl
         this.hand = this.data.hand
-        
-        // Store reference to this component for event handlers
-        const self = this
-        
-        // Listen for collision events
-        this.el.addEventListener('collide', (e) => {
-            this.handleCollision(e)
+        this.raycaster = new THREE.Raycaster()
+        this.isMouseDown = false
+
+        // Mouse down event
+        document.addEventListener('mousedown', (e) => {
+            this.isMouseDown = true
+            this.handleMousePunch(e)
         })
-        
-        // Animation loop for punch detection
-        this.scene.addEventListener('tick', () => {
-            this.detectPunchVelocity()
+
+        // Mouse up event
+        document.addEventListener('mouseup', (e) => {
+            this.isMouseDown = false
         })
+
+        // Touch events for controllers
+        this.el.addEventListener('touchstart', (e) => {
+            this.handleTouchPunch(e)
+        })
+
+        this.el.addEventListener('touchmove', (e) => {
+            if (this.isMouseDown) {
+                this.handleMousePunch(e)
+            }
+        })
+    },
+
+    tick: function () {
+        this.detectPunchVelocity()
+        
+        // Detect controller button presses for VR
+        if (navigator.getGamepads) {
+            const gamepads = navigator.getGamepads()
+            this.checkControllerButtons(gamepads)
+        }
     },
 
     detectPunchVelocity: function () {
         const currentTime = Date.now()
+        
+        if (!this.el.object3D) return
+        
         const currentPosition = this.el.object3D.position.clone()
         
         // Calculate velocity
@@ -41,7 +65,7 @@ AFRAME.registerComponent('punch-detection', {
             const cooldownPassed = (currentTime - this.lastPunchTime) > this.data.cooldown
             
             if (velocity > threshold && cooldownPassed) {
-                this.executePunch(velocity)
+                this.executePunch(velocity, 'velocity')
                 this.lastPunchTime = currentTime
             }
         }
@@ -49,21 +73,116 @@ AFRAME.registerComponent('punch-detection', {
         this.lastPosition = currentPosition.clone()
     },
 
-    executePunch: function (velocity) {
-        // Trigger visual feedback
-        this.el.emit('punch', {velocity: velocity, hand: this.hand})
+    handleMousePunch: function (e) {
+        const currentTime = Date.now()
+        const cooldownPassed = (currentTime - this.lastPunchTime) > this.data.cooldown
         
-        // Check for target collisions
-        this.checkTargetHits()
+        if (!cooldownPassed) return
+        
+        // Get mouse position
+        const mouse = new THREE.Vector2()
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
+        
+        // Get camera and raycaster
+        const camera = this.scene.querySelector('[camera]').object3D
+        this.raycaster.setFromCamera(mouse, camera)
+        
+        // Get all targets
+        const targets = this.scene.querySelectorAll('.target')
+        const targetObjects = Array.from(targets).map(t => t.object3D)
+        
+        // Check intersections
+        const intersects = this.raycaster.intersectObjects(targetObjects)
+        
+        if (intersects.length > 0) {
+            this.lastPunchTime = currentTime
+            const targetObject = intersects[0].object
+            const targetElement = targetObject.el
+            
+            if (targetElement && targetElement.classList.contains('target')) {
+                window.dispatchEvent(new Event("targetHit"))
+                this.executePunch(1.0, 'mouse')
+                if (targetElement.parentNode) {
+                    targetElement.parentNode.removeChild(targetElement)
+                }
+            }
+        }
     },
 
-    checkTargetHits: function () {
-        const scene = this.scene
+    handleTouchPunch: function (e) {
+        const currentTime = Date.now()
+        const cooldownPassed = (currentTime - this.lastPunchTime) > this.data.cooldown
+        
+        if (!cooldownPassed) return
+        
+        // Get touch position
+        if (e.touches && e.touches.length > 0) {
+            const touch = e.touches[0]
+            
+            const mouse = new THREE.Vector2()
+            mouse.x = (touch.clientX / window.innerWidth) * 2 - 1
+            mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1
+            
+            // Get camera and raycaster
+            const camera = this.scene.querySelector('[camera]').object3D
+            this.raycaster.setFromCamera(mouse, camera)
+            
+            // Get all targets
+            const targets = this.scene.querySelectorAll('.target')
+            const targetObjects = Array.from(targets).map(t => t.object3D)
+            
+            // Check intersections
+            const intersects = this.raycaster.intersectObjects(targetObjects)
+            
+            if (intersects.length > 0) {
+                this.lastPunchTime = currentTime
+                const targetObject = intersects[0].object
+                const targetElement = targetObject.el
+                
+                if (targetElement && targetElement.classList.contains('target')) {
+                    window.dispatchEvent(new Event("targetHit"))
+                    this.executePunch(1.0, 'touch')
+                    if (targetElement.parentNode) {
+                        targetElement.parentNode.removeChild(targetElement)
+                    }
+                }
+            }
+        }
+    },
+
+    checkControllerButtons: function (gamepads) {
+        const currentTime = Date.now()
+        const cooldownPassed = (currentTime - this.lastPunchTime) > this.data.cooldown
+        
+        if (!cooldownPassed) return
+        
+        gamepads.forEach((gamepad, index) => {
+            if (!gamepad) return
+            
+            // Check for trigger button (button 0) or grip button (button 1)
+            if (gamepad.buttons && gamepad.buttons.length > 0) {
+                const triggerButton = gamepad.buttons[0]
+                const gripButton = gamepad.buttons[1]
+                
+                // Trigger punch on button press
+                if ((triggerButton && triggerButton.pressed) || (gripButton && gripButton.pressed)) {
+                    // Use controller ray for hit detection
+                    this.detectControllerRayHit(index)
+                    this.lastPunchTime = currentTime
+                }
+            }
+        })
+    },
+
+    detectControllerRayHit: function (gamepadIndex) {
+        if (!this.scene) return
+        
         const punchSphere = this.el.object3D
         const hitDistance = 0.5 // Detection radius
         
         // Get all targets
-        const targets = scene.querySelectorAll('.target')
+        const targets = this.scene.querySelectorAll('.target')
         
         targets.forEach(target => {
             if (!target.object3D) return
@@ -72,46 +191,17 @@ AFRAME.registerComponent('punch-detection', {
             
             if (distance < hitDistance) {
                 window.dispatchEvent(new Event("targetHit"))
-                target.parentNode.removeChild(target)
-            }
-        })
-    },
-
-    handleCollision: function (e) {
-        const target = e.detail.body ? e.detail.body.el : null
-        
-        if (!target) return
-        
-        if (target.classList.contains("target")) {
-            window.dispatchEvent(new Event("targetHit"))
-            target.parentNode.removeChild(target)
-        }
-    },
-
-    tick: function () {
-        // Update hand tracking from WebXR
-        this.updateControllerTracking()
-    },
-
-    updateControllerTracking: function () {
-        if (!navigator.xr) return
-        
-        // Get gamepad data if available
-        const gamepads = navigator.getGamepads ? navigator.getGamepads() : []
-        
-        gamepads.forEach((gamepad) => {
-            if (!gamepad) return
-            
-            // Check for punch trigger (squeeze button)
-            if (gamepad.buttons && gamepad.buttons.length > 0) {
-                const gripButton = gamepad.buttons[1] // Grip button
-                const triggerButton = gamepad.buttons[0] // Trigger button
-                
-                if (gripButton && gripButton.pressed) {
-                    this.detectPunchVelocity()
+                this.executePunch(distance, 'controller')
+                if (target.parentNode) {
+                    target.parentNode.removeChild(target)
                 }
             }
         })
+    },
+
+    executePunch: function (velocity, source) {
+        // Trigger visual feedback
+        this.el.emit('punch', {velocity: velocity, hand: this.hand, source: source})
     }
 
 })

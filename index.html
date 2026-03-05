@@ -7,7 +7,6 @@
 
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.1/dist/aframe-physics-system.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-extras.min.js"></script>
 
     <script src="js/game-manager.js"></script>
     <script src="js/target-spawner.js"></script>
@@ -39,6 +38,12 @@
         </a-text>
 
 
+        <!-- INSTRUCTIONS UI -->
+
+        <a-text id="instructionsText" value="Desktop: Click mouse | VR: Use controller trigger/grip" position="0 1.4 -1" align="center" color="#888" width="6" scale="0.8 0.8 0.8">
+        </a-text>
+
+
         <!-- PLAYER -->
 
         <a-entity id="rig" position="0 1.6 0">
@@ -48,28 +53,20 @@
 
             <!-- LEFT HAND -->
 
-            <a-entity id="leftHand" hand-controls="hand: left" tracked-controls-webxr="hand: left">
+            <a-entity id="leftHand" hand-controls="hand: left">
 
                 <a-sphere radius="0.08" color="red" class="puncher" punch-detection="hand: left" position="0 0 0" scale="1 1 1">
-                    <a-animation attribute="position" from="0 0 0" to="0 0 0" dur="300"></a-animation>
                 </a-sphere>
-
-                <!-- Visual controller model -->
-                <a-gltf-model position="0 0 0" scale="1 1 1"></a-gltf-model>
 
             </a-entity>
 
 
             <!-- RIGHT HAND -->
 
-            <a-entity id="rightHand" hand-controls="hand: right" tracked-controls-webxr="hand: right">
+            <a-entity id="rightHand" hand-controls="hand: right">
 
                 <a-sphere radius="0.08" color="blue" class="puncher" punch-detection="hand: right" position="0 0 0" scale="1 1 1">
-                    <a-animation attribute="position" from="0 0 0" to="0 0 0" dur="300"></a-animation>
                 </a-sphere>
-
-                <!-- Visual controller model -->
-                <a-gltf-model position="0 0 0" scale="1 1 1"></a-gltf-model>
 
             </a-entity>
 
