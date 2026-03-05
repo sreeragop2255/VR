@@ -1,18 +1,14 @@
 AFRAME.registerComponent('punch-detection', {
 
-    tick: function () {
+    init: function () {
 
-        const puncher = this.el
-        const targets = document.querySelectorAll('.target')
+        this.el.addEventListener('collide', (e) => {
 
-        targets.forEach(target => {
+            const target = e.detail.body.el
 
-            const p = puncher.object3D.position
-            const t = target.object3D.position
+            if (!target) return
 
-            const distance = p.distanceTo(t)
-
-            if (distance < 0.35) {
+            if (target.classList.contains("target")) {
 
                 window.dispatchEvent(new Event("targetHit"))
 
