@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>PunchXR</title>
+
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <script src="js/game-manager.js"></script>
+    <script src="js/target-spawner.js"></script>
+    <script src="js/punch-detection.js"></script>
+
+</head>
+
+<body>
+
+    <a-scene>
+
+        <!-- Environment -->
+        <a-sky color="#111"></a-sky>
+        <a-plane rotation="-90 0 0" width="20" height="20" color="#222">
+        </a-plane>
+
+        <!-- Score UI -->
+        <a-text id="scoreText" value="Score: 0" position="0 2 -1" align="center" color="white" width="4">
+        </a-text>
+
+        <!-- Timer UI -->
+        <a-text id="timerText" value="Time: 30" position="0 1.7 -1" align="center" color="white" width="4">
+        </a-text>
+
+        <!-- Player Rig -->
+        <a-entity id="rig" position="0 1.6 0">
+
+            <!-- Left Hand -->
+            <a-entity laser-controls="hand: left">
+
+                <a-sphere radius="0.12" color="red" class="puncher" punch-detection>
+                </a-sphere>
+
+            </a-entity>
+
+            <!-- Right Hand -->
+            <a-entity laser-controls="hand: right">
+
+                <a-sphere radius="0.12" color="blue" class="puncher" punch-detection>
+                </a-sphere>
+
+            </a-entity>
+
+        </a-entity>
+
+        <!-- Target Spawner -->
+        <a-entity target-spawner></a-entity>
+
+    </a-scene>
+
+</body>
+
+</html>
