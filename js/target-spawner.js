@@ -12,6 +12,7 @@ AFRAME.registerComponent('target-spawner', {
             target.setAttribute('color', 'yellow')
             target.setAttribute('class', 'target')
 
+            // Add static body for physics collision detection
             target.setAttribute('static-body', '')
 
             const x = (Math.random() - 0.5) * 4
@@ -20,6 +21,7 @@ AFRAME.registerComponent('target-spawner', {
 
             target.setAttribute('position', `${x} ${y} ${z}`)
 
+            // Add pulsing animation
             target.setAttribute('animation', `
 property: scale;
 to: 1.2 1.2 1.2;
